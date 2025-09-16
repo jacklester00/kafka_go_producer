@@ -213,7 +213,7 @@ func (p *Producer) Close() error {
 			Err:       fmt.Errorf("producer is nil"),
 		}
 	}
-	
+
 	if err := p.producer.Close(); err != nil {
 		return &ProducerError{
 			Operation: "close",
