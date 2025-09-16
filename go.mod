@@ -1,6 +1,6 @@
 module kafka/example_producer
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/Shopify/sarama v1.38.1
