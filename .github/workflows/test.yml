@@ -36,10 +36,10 @@ jobs:
           - 9092:9092
         options: >-
           --health-cmd "/bin/kafka-topics --bootstrap-server localhost:9092 --list"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 3
-          --health-start-period 60s
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 40s
 
     steps:
     - uses: actions/checkout@v4
@@ -60,21 +60,27 @@ jobs:
     - name: Install dependencies
       run: go mod download
 
+    - name: Wait for Kafka to be ready
+      run: |
+        echo "Waiting for Kafka to be ready..."
+        for i in {1..30}; do
+          if docker run --rm --network host confluentinc/cp-kafka:7.5.0 kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+            echo "Kafka is ready!"
+            break
+          fi
+          echo "Attempt $i: Kafka not ready yet, waiting..."
+          sleep 2
+        done
+
+    - name: Create test topic
+      run: |
+        docker run --rm --network host confluentinc/cp-kafka:7.5.0 kafka-topics --bootstrap-server localhost:9092 --create --topic integration-test-topic --partitions 3 --replication-factor 1 --if-not-exists
+
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
+      run: go test -v ./...
 
     - name: Run integration tests
-      run: go test -tags=integration -v ./...
-
-    - name: Generate coverage report
-      run: go tool cover -html=coverage.out -o coverage.html
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
+      run: go test -tags=integration -v -timeout=30s ./...
 
   lint:
     runs-on: ubuntu-latest

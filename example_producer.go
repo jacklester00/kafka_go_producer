@@ -43,6 +43,10 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 
 // SendMessage sends a single message to Kafka
 func (p *Producer) SendMessage(key, value string) error {
+	if key == "" && value == "" {
+		return fmt.Errorf("both key and value cannot be empty")
+	}
+
 	message := &sarama.ProducerMessage{
 		Topic: p.topic,
 		Key:   sarama.StringEncoder(key),
