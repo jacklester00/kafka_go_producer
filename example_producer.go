@@ -22,7 +22,7 @@ type Producer struct {
 // NewProducer creates a new Kafka producer
 func NewProducer(brokers []string, topic string) (*Producer, error) {
 	config := sarama.NewConfig()
-	config.Version = sarama.V2_8_1_0 // Use appropriate Kafka version
+	config.Version = sarama.V2_8_1_0                 // Use appropriate Kafka version
 	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack
 	config.Producer.Retry.Max = 5                    // Retry up to 5 times to produce the message
 	config.Producer.Return.Successes = true
@@ -118,7 +118,7 @@ func (p *Producer) StartBatchProducer(ctx context.Context, messages chan Message
 		select {
 		case msg := <-messages:
 			batch = append(batch, msg)
-			
+
 			// Send batch when it reaches the desired size
 			if len(batch) >= batchSize {
 				if err := p.SendBatchMessages(batch); err != nil {
@@ -183,7 +183,7 @@ func main() {
 	for i := 0; i < 5; i++ {
 		key := fmt.Sprintf("key-%d", i)
 		value := fmt.Sprintf("Hello Kafka! Message %d", i)
-		
+
 		if err := producer.SendMessage(key, value); err != nil {
 			log.Printf("Failed to send message %d: %v", i, err)
 		}
@@ -204,7 +204,7 @@ func main() {
 	// Example 3: Batch producer
 	log.Println("Starting batch producer...")
 	messagesChan := make(chan MessageData, 100)
-	
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -218,7 +218,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		defer close(messagesChan)
-		
+
 		for i := 0; i < 10; i++ {
 			select {
 			case messagesChan <- MessageData{
