@@ -116,7 +116,18 @@ func (p *Producer) StartBatchProducer(ctx context.Context, messages chan Message
 
 	for {
 		select {
-		case msg := <-messages:
+		case msg, ok := <-messages:
+			if !ok {
+				// Channel is closed, send any remaining messages and exit
+				if len(batch) > 0 {
+					if err := p.SendBatchMessages(batch); err != nil {
+						log.Printf("Error sending final batch: %v", err)
+					}
+				}
+				log.Println("Message channel closed, batch producer stopping")
+				return nil
+			}
+
 			batch = append(batch, msg)
 
 			// Send batch when it reaches the desired size
@@ -233,14 +244,22 @@ func main() {
 		}
 	}()
 
-	// Wait for shutdown signal
-	<-signals
-	log.Println("Received shutdown signal, stopping producer...")
+	// Wait for either shutdown signal or all work to complete
+	go func() {
+		wg.Wait()
+		log.Println("All producer tasks completed, shutting down...")
+		cancel()
+	}()
 
-	// Cancel context to stop producer
-	cancel()
+	select {
+	case <-signals:
+		log.Println("Received shutdown signal, stopping producer...")
+		cancel()
+	case <-ctx.Done():
+		log.Println("Producer tasks completed")
+	}
 
-	// Wait for producer to finish
+	// Wait for any remaining goroutines to finish
 	wg.Wait()
 	log.Println("Producer stopped gracefully")
 }

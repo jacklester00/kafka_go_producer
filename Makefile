@@ -55,8 +55,14 @@ run: build
 docker-up:
 	docker-compose up -d
 	@echo "Waiting for Kafka to be ready..."
-	@until docker-compose ps | grep -q "healthy"; do sleep 2; done
-	@echo "Kafka is ready!"
+	@for i in $$(seq 1 30); do \
+		if docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then \
+			echo "Kafka is ready!"; \
+			break; \
+		fi; \
+		echo "Attempt $$i: Kafka not ready yet, waiting..."; \
+		sleep 2; \
+	done
 
 # Start Kafka cluster with UI
 docker-up-ui:
