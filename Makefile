@@ -73,7 +73,7 @@ docker-up-ui:
 
 # Stop Kafka cluster
 docker-down:
-	docker-compose down
+	docker-compose down -v
 
 # Stop Kafka cluster and remove volumes
 docker-down-clean:
