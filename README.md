@@ -12,7 +12,7 @@ A simple, clean example of building a Kafka producer in Go using the Sarama libr
 ```
 kafka_go_producer/
 ├── README.md              # This file
-├── docker-compose.yml     # Kafka cluster setup
+├── docker-compose.yml     # Kafka cluster setup (KRaft mode)
 ├── example_producer.go    # Main producer implementation
 ├── example_producer_test.go # Simple unit tests
 ├── integration_test.go    # Integration tests (requires Kafka)
@@ -87,19 +87,10 @@ make docker-logs        # View Kafka logs
 # Development
 make build              # Build the application
 make run                # Build and run producer
-make test               # Run unit tests
-make integration-test   # Run integration tests (requires Kafka)
-
-# Code quality
-make fmt                # Format code
-make lint               # Run linter
-make check              # Run all checks
+make test               # Run tests
 
 # Kafka operations
-make create-topic       # Create test topic
-make list-topics        # List all topics
-make consume-messages   # Start console consumer
-make send-test-messages # Send test messages via console producer
+make consume-messages   # View messages in console
 ```
 
 ## Features
@@ -176,8 +167,8 @@ docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --list
 
 **Reset everything**:
 ```bash
-docker-compose down -v  # Removes all data
-docker-compose up -d    # Fresh start
+make docker-down        # Removes all data and containers
+make docker-up          # Fresh start
 ```
 
 ## Performance Tips
