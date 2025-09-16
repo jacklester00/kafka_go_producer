@@ -13,38 +13,73 @@ import (
 	"github.com/Shopify/sarama"
 )
 
+// ProducerError represents a custom error type for producer operations
+type ProducerError struct {
+	Operation string
+	Err       error
+}
+
+func (e *ProducerError) Error() string {
+	return fmt.Sprintf("producer %s failed: %v", e.Operation, e.Err)
+}
+
+// Config holds configuration for the Kafka producer
+type Config struct {
+	Brokers       []string
+	Topic         string
+	BatchSize     int
+	FlushInterval time.Duration
+}
+
 // Producer represents a Kafka producer
 type Producer struct {
 	producer sarama.SyncProducer
 	topic    string
 }
 
-// NewProducer creates a new Kafka producer
+// NewProducer creates a new Kafka producer with default configuration
 func NewProducer(brokers []string, topic string) (*Producer, error) {
-	config := sarama.NewConfig()
-	config.Version = sarama.V2_8_1_0                 // Use appropriate Kafka version
-	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack
-	config.Producer.Retry.Max = 5                    // Retry up to 5 times to produce the message
-	config.Producer.Return.Successes = true
-	config.Producer.Return.Errors = true
-	config.Producer.Compression = sarama.CompressionSnappy // Compress messages
-	config.Producer.Flush.Frequency = 500 * time.Millisecond
+	config := Config{
+		Brokers:       brokers,
+		Topic:         topic,
+		BatchSize:     3,
+		FlushInterval: 500 * time.Millisecond,
+	}
+	return NewProducerWithConfig(config)
+}
 
-	producer, err := sarama.NewSyncProducer(brokers, config)
+// NewProducerWithConfig creates a new Kafka producer with custom configuration
+func NewProducerWithConfig(config Config) (*Producer, error) {
+	saramaConfig := sarama.NewConfig()
+	saramaConfig.Version = sarama.V2_8_1_0                 // Use appropriate Kafka version
+	saramaConfig.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack
+	saramaConfig.Producer.Retry.Max = 5                    // Retry up to 5 times to produce the message
+	saramaConfig.Producer.Return.Successes = true
+	saramaConfig.Producer.Return.Errors = true
+	saramaConfig.Producer.Compression = sarama.CompressionSnappy // Compress messages
+	saramaConfig.Producer.Flush.Frequency = config.FlushInterval
+
+	producer, err := sarama.NewSyncProducer(config.Brokers, saramaConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create producer: %w", err)
+		return nil, &ProducerError{
+			Operation: "create",
+			Err:       err,
+		}
 	}
 
 	return &Producer{
 		producer: producer,
-		topic:    topic,
+		topic:    config.Topic,
 	}, nil
 }
 
 // SendMessage sends a single message to Kafka
 func (p *Producer) SendMessage(key, value string) error {
 	if key == "" && value == "" {
-		return fmt.Errorf("both key and value cannot be empty")
+		return &ProducerError{
+			Operation: "send",
+			Err:       fmt.Errorf("both key and value cannot be empty"),
+		}
 	}
 
 	message := &sarama.ProducerMessage{
@@ -55,14 +90,17 @@ func (p *Producer) SendMessage(key, value string) error {
 
 	partition, offset, err := p.producer.SendMessage(message)
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return &ProducerError{
+			Operation: "send",
+			Err:       err,
+		}
 	}
 
 	log.Printf("Message sent successfully - Topic: %s, Partition: %d, Offset: %d", p.topic, partition, offset)
 	return nil
 }
 
-// SendMessageWithHeaders sends a message with custom headers
+// SendMessageWithHeaders sends a message with custom headers to Kafka
 func (p *Producer) SendMessageWithHeaders(key, value string, headers map[string]string) error {
 	message := &sarama.ProducerMessage{
 		Topic: p.topic,
@@ -83,31 +121,39 @@ func (p *Producer) SendMessageWithHeaders(key, value string, headers map[string]
 
 	partition, offset, err := p.producer.SendMessage(message)
 	if err != nil {
-		return fmt.Errorf("failed to send message with headers: %w", err)
+		return &ProducerError{
+			Operation: "send_with_headers",
+			Err:       err,
+		}
 	}
 
 	log.Printf("Message with headers sent successfully - Topic: %s, Partition: %d, Offset: %d", p.topic, partition, offset)
 	return nil
 }
 
-// SendBatchMessages sends multiple messages in batch
+// SendBatchMessages sends multiple messages in batch to Kafka
 func (p *Producer) SendBatchMessages(messages []MessageData) error {
 	for _, msg := range messages {
 		err := p.SendMessage(msg.Key, msg.Value)
 		if err != nil {
-			return fmt.Errorf("failed to send batch message (key: %s): %w", msg.Key, err)
+			return &ProducerError{
+				Operation: "send_batch",
+				Err:       fmt.Errorf("failed to send batch message (key: %s): %w", msg.Key, err),
+			}
 		}
 	}
 	return nil
 }
 
-// MessageData represents a message to be sent
+// MessageData represents a message to be sent to Kafka
 type MessageData struct {
 	Key   string
 	Value string
 }
 
-// StartBatchProducer starts a producer that sends messages at regular intervals
+// StartBatchProducer starts a producer that sends messages at regular intervals.
+// It batches messages up to batchSize and sends them either when the batch is full
+// or when the interval timer expires.
 func (p *Producer) StartBatchProducer(ctx context.Context, messages chan MessageData, batchSize int, interval time.Duration) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -159,12 +205,22 @@ func (p *Producer) StartBatchProducer(ctx context.Context, messages chan Message
 	}
 }
 
-// Close closes the producer
+// Close closes the producer and releases resources
 func (p *Producer) Close() error {
 	if p.producer == nil {
-		return fmt.Errorf("producer is nil")
+		return &ProducerError{
+			Operation: "close",
+			Err:       fmt.Errorf("producer is nil"),
+		}
 	}
-	return p.producer.Close()
+	
+	if err := p.producer.Close(); err != nil {
+		return &ProducerError{
+			Operation: "close",
+			Err:       err,
+		}
+	}
+	return nil
 }
 
 func main() {
