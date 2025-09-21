@@ -19,6 +19,7 @@ type ProducerError struct {
 	Err       error
 }
 
+// Error implements error interface
 func (e *ProducerError) Error() string {
 	return fmt.Sprintf("producer %s failed: %v", e.Operation, e.Err)
 }
