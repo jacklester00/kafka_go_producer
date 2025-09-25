@@ -11,7 +11,7 @@ A simple, clean example of building a Kafka producer in Go using the Sarama libr
 
 ```
 kafka_go_producer/
-├── README.md              # This file
+├── README.md              # Learn how to build a Kafka producer in Go
 ├── docker-compose.yml     # Kafka cluster setup (KRaft mode)
 ├── example_producer.go    # Main producer implementation
 ├── example_producer_test.go # Simple unit tests
